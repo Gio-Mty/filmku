@@ -20,17 +20,18 @@ class Backend {
 
   static List<String> get _candidates {
     if (_override.isNotEmpty) return [_override];
-    if (kIsWeb) return ['http://localhost:8000'];
+    if (kIsWeb) return ['https://filmku-rho.vercel.app', 'http://localhost:8000'];
     if (defaultTargetPlatform == TargetPlatform.android) {
       return [
-        'http://192.168.1.4:8000',    // Wi-Fi LAN Laptop saat ini
-        'http://127.0.0.1:8000',      // HP Fisik via USB (adb reverse)
-        'http://localhost:8000',      // Fallback
-        'http://10.0.2.2:8000',       // Emulator Android
-        'http://10.188.148.47:8000',  // Wi-Fi LAN cadangan
+        'https://filmku-rho.vercel.app', // Vercel Cloud Server (Bisa diakses dari mana saja tanpa Wi-Fi laptop)
+        'http://192.168.1.4:8000',       // Wi-Fi LAN Laptop saat ini
+        'http://127.0.0.1:8000',         // HP Fisik via USB (adb reverse)
+        'http://localhost:8000',         // Fallback
+        'http://10.0.2.2:8000',          // Emulator Android
+        'http://10.188.148.47:8000',     // Wi-Fi LAN cadangan
       ];
     }
-    return ['http://localhost:8000'];
+    return ['https://filmku-rho.vercel.app', 'http://localhost:8000'];
   }
 
   static String get baseUrl => _workingBaseUrl ?? _candidates.first;

@@ -37,13 +37,30 @@ from pydantic import BaseModel
 
 try:
     import psycopg2
-    from import_tmdb_to_postgres import normalize_db_url
 except ImportError:
     psycopg2 = None
-    try:
-        from backend.import_tmdb_to_postgres import normalize_db_url
-    except ImportError:
-        normalize_db_url = lambda u: u
+
+
+def normalize_db_url(url: str) -> str:
+    """Normalisasi format URL PostgreSQL untuk Supabase / cloud database."""
+    url = url.strip().strip("\"'")
+    if url.startswith("postgres://"):
+        url = "postgresql://" + url[len("postgres://") :]
+    if "@" in url and "://" in url:
+        scheme, rest = url.split("://", 1)
+        auth, host_part = rest.split("@", 1)
+        if ":" in auth:
+            user, pwd = auth.split(":", 1)
+            pwd = pwd.replace("#", "%23")
+            url = f"{scheme}://{user}:{pwd}@{host_part}"
+    if "supabase" in url and "sslmode" not in url:
+        sep = "&" if "?" in url else "?"
+        url = f"{url}{sep}sslmode=require"
+    return url
+
+
+DEFAULT_TMDB_API_KEY = "01dc9c33c0d3409a40496ff8ff5bdb35"
+DEFAULT_DATABASE_URL = "postgresql://postgres.mjywpvwfoiymdvfjvsig:%23Moty33Giovanny@aws-1-ap-southeast-1.pooler.supabase.com:5432/postgres"
 
 
 ARCHIVE = "https://archive.org"
@@ -59,14 +76,18 @@ MAX_CAST = 20
 
 def _load_dotenv() -> None:
     """Muat backend/.env (KEY=VALUE per baris) tanpa dependensi tambahan."""
-    path = Path(__file__).with_name(".env")
-    if not path.is_file():
-        return
-    for line in path.read_text(encoding="utf-8").splitlines():
-        line = line.strip()
-        if line and not line.startswith("#") and "=" in line:
-            key, _, value = line.partition("=")
-            os.environ.setdefault(key.strip(), value.strip().strip("\"'"))
+    for p in [
+        Path(__file__).with_name(".env"),
+        Path(__file__).resolve().parent.parent / "backend" / ".env",
+        Path(__file__).resolve().parent.parent / ".env",
+    ]:
+        if p.is_file():
+            for line in p.read_text(encoding="utf-8").splitlines():
+                line = line.strip()
+                if line and not line.startswith("#") and "=" in line:
+                    key, _, value = line.partition("=")
+                    os.environ.setdefault(key.strip(), value.strip().strip("\"'"))
+            break
 
 
 _load_dotenv()
@@ -576,7 +597,62 @@ async def lifespan(app: FastAPI):
 
 
 app = FastAPI(title="filmku backend", version="1.0.0", lifespan=lifespan)
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["GET"])
+app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
+
+_global_limiter = asyncio.Semaphore(MAX_CONCURRENT_REQUESTS)
+_global_http: httpx.AsyncClient | None = None
+_global_tmdb: httpx.AsyncClient | None = None
+_global_catalog: dict[str, Any] = {}
+_global_tmdb_genres: dict[int, str] = {}
+
+
+def _get_global_http() -> httpx.AsyncClient:
+    global _global_http
+    if _global_http is None or _global_http.is_closed:
+        _global_http = httpx.AsyncClient(
+            base_url=ARCHIVE,
+            headers={"User-Agent": "filmku-backend/1.0"},
+            timeout=httpx.Timeout(20.0, connect=10.0),
+            follow_redirects=True,
+        )
+    return _global_http
+
+
+def _get_global_tmdb() -> httpx.AsyncClient:
+    global _global_tmdb
+    if _global_tmdb is None or _global_tmdb.is_closed:
+        _global_tmdb = httpx.AsyncClient(
+            base_url=TMDB,
+            headers={"User-Agent": "filmku-backend/1.0"},
+            timeout=httpx.Timeout(20.0, connect=10.0),
+        )
+    return _global_tmdb
+
+
+@app.middleware("http")
+async def ensure_state_middleware(request: Request, call_next):
+    if not hasattr(request.state, "limiter") or request.state.limiter is None:
+        request.state.limiter = _global_limiter
+    if not hasattr(request.state, "http") or request.state.http is None:
+        request.state.http = _get_global_http()
+    if not hasattr(request.state, "tmdb") or request.state.tmdb is None:
+        request.state.tmdb = _get_global_tmdb()
+    if not hasattr(request.state, "catalog") or request.state.catalog is None:
+        request.state.catalog = _global_catalog
+    if not hasattr(request.state, "tmdb_genres") or request.state.tmdb_genres is None:
+        request.state.tmdb_genres = _global_tmdb_genres
+    return await call_next(request)
+
+
+@app.get("/")
+@app.get("/api")
+def home():
+    return {
+        "status": "ok",
+        "service": "filmku backend online",
+        "timestamp": time.time(),
+    }
+
 
 
 async def fetch(request: Request, path: str, params: dict[str, Any] | None = None) -> httpx.Response:
@@ -619,7 +695,7 @@ async def catalog_series(request: Request, slug: str) -> Series:
 
 async def tmdb_get(request: Request, path: str, params: dict[str, Any] | None = None) -> dict[str, Any]:
     """GET ke TMDB dengan API key dari environment; key tidak pernah dikirim ke klien."""
-    key = os.environ.get("TMDB_API_KEY", "").strip()
+    key = os.environ.get("TMDB_API_KEY", "").strip() or DEFAULT_TMDB_API_KEY
     if not key:
         raise HTTPException(503, "TMDB_API_KEY belum diatur di backend/.env")
     # Token v4 (JWT, diawali 'eyJ') dikirim lewat header; key v3 lewat query.
@@ -902,7 +978,7 @@ async def supabase_movies(
     q: str | None = Query(None, max_length=100),
 ) -> TmdbPage:
     """Ambil film dari database Supabase (tabel tmdb_movies)."""
-    db_url = os.environ.get("DATABASE_URL", "").strip()
+    db_url = os.environ.get("DATABASE_URL", "").strip() or DEFAULT_DATABASE_URL
     if not db_url:
         raise HTTPException(503, "DATABASE_URL belum diatur di backend/.env")
     if psycopg2 is None:
