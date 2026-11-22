@@ -1193,29 +1193,30 @@ class AppVersionInfo(BaseModel):
 
 @app.get("/api/app/version", response_model=AppVersionInfo)
 async def get_app_version(request: Request) -> AppVersionInfo:
-    base_url = str(request.base_url).rstrip("/")
     return AppVersionInfo(
-        latest_version="1.1.0",
-        version_code=2,
+        latest_version="1.2.0",
+        version_code=3,
         changelog=[
-            "Koleksi Drama Korea (Drakor) lengkap (On-Going, Top Rated, Romantis, Thriller)",
-            "Fitur Multi-Server: VidFast, VidSrc, MultiEmbed, AutoEmbed",
-            "Semua judul drama Korea & anime Jepang otomatis dalam Bahasa Inggris",
-            "Daftar episode lengkap dengan thumbnail dan jadwal tayang serial",
-            "Fitur In-App Auto-Update langsung di dalam aplikasi",
+            "Layar Penuh Sejati (True Immersive Sticky Fullscreen)",
+            "Fitur Baru: Isi Layar Penuh (Zoom to Fill) menghilangkan bar hitam samping",
+            "Server VidLink (No Ads) dengan Subtitle Multi-Bahasa yang Otomatis Pas & Sinkron",
+            "Fitur Pilih Episode langsung di dalam Player Layar Penuh",
+            "Dok Kontrol Layar Penuh (Pilih Episode, Ganti Server, Bantuan Subtitle)",
+            "Perbaikan bug riwayat tontonan Godzilla & Anime",
+            "Domain VidSrc diperbarui ke vidsrc.xyz aktif",
         ],
-        download_url=f"{base_url}/download/filmku.apk",
+        download_url="https://github.com/Gio-Mty/filmku/releases/latest/download/filmku.apk",
         released_at="2026-11-22",
         force_update=False,
     )
 
 
 @app.api_route("/download/filmku.apk", methods=["GET", "HEAD"])
-async def download_apk() -> FileResponse:
+async def download_apk() -> Response:
     possible_paths = [
         Path(__file__).parent / "downloads" / "filmku.apk",
+        Path(__file__).parent.parent / "build" / "app" / "outputs" / "flutter-apk" / "app-arm64-v8a-release.apk",
         Path(__file__).parent.parent / "build" / "app" / "outputs" / "flutter-apk" / "app-release.apk",
-        Path(__file__).parent.parent / "build" / "app" / "outputs" / "flutter-apk" / "app-debug.apk",
     ]
     for p in possible_paths:
         if p.is_file():
@@ -1224,7 +1225,11 @@ async def download_apk() -> FileResponse:
                 media_type="application/vnd.android.package-archive",
                 filename="filmku-latest.apk",
             )
-    raise HTTPException(404, "File APK belum ditemukan di server. Silakan bangun APK terlebih dahulu.")
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(
+        url="https://github.com/Gio-Mty/filmku/releases/latest/download/filmku.apk",
+        status_code=302,
+    )
 
 
 try:

@@ -6,8 +6,8 @@ import '../models/app_version.dart';
 import '../screens/navigation.dart';
 import '../theme.dart';
 
-const currentAppVersion = '1.1.0';
-const currentAppBuildNumber = 2;
+const currentAppVersion = '1.2.0';
+const currentAppBuildNumber = 3;
 
 Future<void> checkAndShowUpdate(BuildContext context, {bool manual = false}) async {
   // Di platform Web (Chrome), tidak perlu mendownload installer APK Android.
