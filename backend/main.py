@@ -14,6 +14,8 @@ Jalankan dari folder ini:
     .venv\\Scripts\\python -m uvicorn main:app --port 8000 --reload
 """
 
+from __future__ import annotations
+
 import asyncio
 import base64
 import json
@@ -293,7 +295,7 @@ def parse_playlist(html: str) -> list[dict[str, Any]]:
 
     Semua kegagalan dilaporkan sebagai ValueError (termasuk JSON/base64 yang rusak).
     """
-    soup = BeautifulSoup(html, "lxml", parse_only=SoupStrainer("play-av"))
+    soup = BeautifulSoup(html, "html.parser", parse_only=SoupStrainer("play-av"))
     player = soup.find("play-av", attrs={"playlist": True})
     if player is None:
         raise ValueError("atribut playlist pada <play-av> tidak ditemukan")
@@ -309,7 +311,7 @@ def clean_html(value: Any) -> str:
         value = "\n\n".join(str(v) for v in value)
     if not value:
         return ""
-    soup = BeautifulSoup(str(value), "lxml")
+    soup = BeautifulSoup(str(value), "html.parser")
     for br in soup.find_all("br"):
         br.replace_with("\n")
     for block in soup.find_all(["p", "div", "li", "tr", "h1", "h2", "h3", "h4"]):
@@ -599,11 +601,18 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="filmku backend", version="1.0.0", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
-_global_limiter = asyncio.Semaphore(MAX_CONCURRENT_REQUESTS)
+_global_limiter: asyncio.Semaphore | None = None
 _global_http: httpx.AsyncClient | None = None
 _global_tmdb: httpx.AsyncClient | None = None
 _global_catalog: dict[str, Any] = {}
 _global_tmdb_genres: dict[int, str] = {}
+
+
+def _get_global_limiter() -> asyncio.Semaphore:
+    global _global_limiter
+    if _global_limiter is None:
+        _global_limiter = asyncio.Semaphore(MAX_CONCURRENT_REQUESTS)
+    return _global_limiter
 
 
 def _get_global_http() -> httpx.AsyncClient:
@@ -632,7 +641,7 @@ def _get_global_tmdb() -> httpx.AsyncClient:
 @app.middleware("http")
 async def ensure_state_middleware(request: Request, call_next):
     if not hasattr(request.state, "limiter") or request.state.limiter is None:
-        request.state.limiter = _global_limiter
+        request.state.limiter = _get_global_limiter()
     if not hasattr(request.state, "http") or request.state.http is None:
         request.state.http = _get_global_http()
     if not hasattr(request.state, "tmdb") or request.state.tmdb is None:
