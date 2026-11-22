@@ -1202,3 +1202,10 @@ async def download_apk() -> FileResponse:
                 filename="filmku-latest.apk",
             )
     raise HTTPException(404, "File APK belum ditemukan di server. Silakan bangun APK terlebih dahulu.")
+
+
+try:
+    from mangum import Mangum
+    handler = Mangum(app)
+except Exception:
+    handler = app
