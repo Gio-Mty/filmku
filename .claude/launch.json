@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "filmku-web",
+      "runtimeExecutable": "python",
+      "runtimeArgs": ["-m", "http.server", "8090", "--directory", "build/web"],
+      "port": 8090
+    },
+    {
+      "name": "filmku-backend",
+      "runtimeExecutable": "D:\\CODE_PROJECT\\filmku\\backend\\.venv\\Scripts\\python.exe",
+      "runtimeArgs": ["-m", "uvicorn", "main:app", "--app-dir", "backend", "--port", "8000"],
+      "port": 8000
+    }
+  ]
+}
