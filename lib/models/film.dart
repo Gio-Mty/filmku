@@ -59,6 +59,48 @@ class Film {
     this.episodeNumber,
   });
 
+  Film copyWith({
+    String? id,
+    String? title,
+    int? year,
+    String? duration,
+    List<String>? genres,
+    double? rating,
+    String? quality,
+    String? synopsis,
+    String? posterUrl,
+    String? videoUrl,
+    String? license,
+    String? credit,
+    String? archiveId,
+    String? subtitleUrl,
+    String? seriesSlug,
+    int? tvId,
+    int? seasonNumber,
+    int? episodeNumber,
+  }) {
+    return Film(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      year: year ?? this.year,
+      duration: duration ?? this.duration,
+      genres: genres ?? this.genres,
+      rating: rating ?? this.rating,
+      quality: quality ?? this.quality,
+      synopsis: synopsis ?? this.synopsis,
+      posterUrl: posterUrl ?? this.posterUrl,
+      videoUrl: videoUrl ?? this.videoUrl,
+      license: license ?? this.license,
+      credit: credit ?? this.credit,
+      archiveId: archiveId ?? this.archiveId,
+      subtitleUrl: subtitleUrl ?? this.subtitleUrl,
+      seriesSlug: seriesSlug ?? this.seriesSlug,
+      tvId: tvId ?? this.tvId,
+      seasonNumber: seasonNumber ?? this.seasonNumber,
+      episodeNumber: episodeNumber ?? this.episodeNumber,
+    );
+  }
+
   bool get playable => videoUrl != null || embedUrl != null;
 
   bool get isTv =>
