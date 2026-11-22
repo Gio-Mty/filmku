@@ -601,6 +601,29 @@ async def lifespan(app: FastAPI):
 app = FastAPI(title="filmku backend", version="1.0.0", lifespan=lifespan)
 app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
 
+
+class PathRewriteMiddleware:
+    def __init__(self, app):
+        self.app = app
+
+    async def __call__(self, scope, receive, send):
+        if scope.get("type") == "http":
+            query_string = scope.get("query_string", b"").decode("utf-8", errors="ignore")
+            from urllib.parse import parse_qs, urlencode
+            params = parse_qs(query_string, keep_blank_values=True)
+            if "__path__" in params:
+                raw_path = params.pop("__path__")[0]
+                scope["path"] = raw_path if raw_path.startswith("/") else f"/{raw_path}"
+                scope["raw_path"] = scope["path"].encode("utf-8")
+                scope["query_string"] = urlencode(params, doseq=True).encode("utf-8")
+            elif scope.get("path") in ("/api/index.py", "/api/index"):
+                scope["path"] = "/"
+                scope["raw_path"] = b"/"
+        await self.app(scope, receive, send)
+
+
+app.add_middleware(PathRewriteMiddleware)
+
 _global_limiter: asyncio.Semaphore | None = None
 _global_http: httpx.AsyncClient | None = None
 _global_tmdb: httpx.AsyncClient | None = None
@@ -1202,17 +1225,6 @@ async def download_apk() -> FileResponse:
                 filename="filmku-latest.apk",
             )
     raise HTTPException(404, "File APK belum ditemukan di server. Silakan bangun APK terlebih dahulu.")
-
-
-@app.get("/{full_path:path}")
-async def debug_unmatched(request: Request, full_path: str):
-    return {
-        "debug": "unmatched_route",
-        "full_path": full_path,
-        "request_url_path": request.url.path,
-        "scope_path": request.scope.get("path"),
-        "headers": dict(request.headers),
-    }
 
 
 try:
