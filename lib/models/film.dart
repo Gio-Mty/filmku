@@ -143,7 +143,7 @@ class Film {
     if (mid != null) {
       switch (server) {
         case VideoServer.vidfast:
-          return 'https://vidfast.vc/movie/$mid?theme=00D97E';
+          return 'https://vidfast.vc/movie/$mid?theme=00D97E&sub=id';
         case VideoServer.vidlink:
           return 'https://vidlink.pro/movie/$mid?primaryColor=00D97E';
         case VideoServer.vidsrc:

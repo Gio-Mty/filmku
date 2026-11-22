@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../data/backend.dart';
 import '../models/film.dart';
@@ -32,10 +33,15 @@ class _EmbedPlayerScreenState extends State<EmbedPlayerScreen> {
   late int _selectedSeason;
   Future<TvDetail>? _tvDetailFuture;
   Future<List<TvEpisode>>? _episodesFuture;
+  bool _isLandscape = false;
+  bool _isFullscreen = false;
 
   @override
   void initState() {
     super.initState();
+    // Otomatis sembunyikan status bar & navigasi sistem (Immersive Sticky Fullscreen)
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+
     _currentFilm = widget.film;
     _selectedSeason = widget.film.seasonNumber ?? 1;
 
@@ -105,8 +111,50 @@ class _EmbedPlayerScreenState extends State<EmbedPlayerScreen> {
         Duration(seconds: _controller.duration.toInt()),
       );
     }
+    // Kembalikan orientasi dan status bar sistem saat keluar pemutar
+    SystemChrome.setEnabledSystemUIMode(
+      SystemUiMode.manual,
+      overlays: SystemUiOverlay.values,
+    );
+    SystemChrome.setPreferredOrientations(DeviceOrientation.values);
+
     _controller.dispose();
     super.dispose();
+  }
+
+  void _toggleRotation() {
+    setState(() {
+      _isLandscape = !_isLandscape;
+      if (_isLandscape) {
+        SystemChrome.setPreferredOrientations([
+          DeviceOrientation.landscapeLeft,
+          DeviceOrientation.landscapeRight,
+        ]);
+      } else {
+        SystemChrome.setPreferredOrientations([
+          DeviceOrientation.portraitUp,
+          DeviceOrientation.portraitDown,
+        ]);
+      }
+    });
+  }
+
+  void _toggleFullscreen() {
+    setState(() {
+      _isFullscreen = !_isFullscreen;
+      if (_isFullscreen) {
+        _isLandscape = true;
+        SystemChrome.setPreferredOrientations([
+          DeviceOrientation.landscapeLeft,
+          DeviceOrientation.landscapeRight,
+        ]);
+        SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+      } else {
+        _isLandscape = false;
+        SystemChrome.setPreferredOrientations(DeviceOrientation.values);
+        SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+      }
+    });
   }
 
   void _openWatchParty() {
@@ -433,98 +481,122 @@ class _EmbedPlayerScreenState extends State<EmbedPlayerScreen> {
 
     return Scaffold(
       backgroundColor: Colors.black,
-      appBar: AppBar(
-        backgroundColor: const Color(0xFF141416),
-        elevation: 0,
-        leading: IconButton(
-          tooltip: 'Kembali',
-          icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-          onPressed: () => Navigator.pop(context),
-        ),
-        title: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              _currentFilm.title,
-              maxLines: 1,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                fontSize: 15,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
+      appBar: _isFullscreen
+          ? null
+          : AppBar(
+              backgroundColor: const Color(0xFF141416),
+              elevation: 0,
+              leading: IconButton(
+                tooltip: 'Kembali',
+                icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+                onPressed: () => Navigator.pop(context),
               ),
-            ),
-            Row(
-              children: [
-                if (_currentFilm.isTv && _currentFilm.episodeNumber != null)
+              title: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
                   Text(
-                    'S$_selectedSeason:E${_currentFilm.episodeNumber} • ',
+                    _currentFilm.title,
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
                     style: const TextStyle(
-                        fontSize: 11,
-                        color: AppColors.accent,
-                        fontWeight: FontWeight.bold),
+                      fontSize: 15,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
                   ),
-                Text(
-                  _server.label,
-                  style: const TextStyle(fontSize: 11, color: AppColors.muted),
-                ),
-                if (_activeRoomId != null) ...[
-                  const SizedBox(width: 8),
-                  Container(
-                    padding:
-                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: AppColors.accent,
-                      borderRadius: BorderRadius.circular(4),
-                    ),
-                    child: Text(
-                      'NOBAR: $_activeRoomId',
-                      style: const TextStyle(
-                        color: Colors.black,
-                        fontWeight: FontWeight.bold,
-                        fontSize: 10,
+                  Row(
+                    children: [
+                      if (_currentFilm.isTv &&
+                          _currentFilm.episodeNumber != null)
+                        Text(
+                          'S$_selectedSeason:E${_currentFilm.episodeNumber} • ',
+                          style: const TextStyle(
+                              fontSize: 11,
+                              color: AppColors.accent,
+                              fontWeight: FontWeight.bold),
+                        ),
+                      Text(
+                        _server.label,
+                        style: const TextStyle(
+                            fontSize: 11, color: AppColors.muted),
                       ),
-                    ),
+                      if (_activeRoomId != null) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: AppColors.accent,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Text(
+                            'NOBAR: $_activeRoomId',
+                            style: const TextStyle(
+                              color: Colors.black,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 10,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                 ],
+              ),
+              actions: [
+                if (_currentFilm.isTv && _currentFilm.parsedTvId != null)
+                  IconButton(
+                    tooltip: 'Pilih Episode',
+                    icon: const Icon(Icons.video_library_rounded,
+                        size: 20, color: Colors.white),
+                    onPressed: _showEpisodePicker,
+                  ),
+                IconButton(
+                  tooltip: 'Rotasi Layar',
+                  icon: Icon(
+                    _isLandscape
+                        ? Icons.screen_lock_landscape_rounded
+                        : Icons.screen_rotation_rounded,
+                    size: 20,
+                    color: Colors.white,
+                  ),
+                  onPressed: _toggleRotation,
+                ),
+                IconButton(
+                  tooltip: 'Layar Penuh (100% Fullscreen)',
+                  icon: const Icon(Icons.fullscreen_rounded,
+                      size: 24, color: Colors.white),
+                  onPressed: _toggleFullscreen,
+                ),
+                IconButton(
+                  tooltip: 'Ganti Server Pemutar',
+                  icon: const Icon(Icons.dns_rounded,
+                      size: 20, color: Colors.white),
+                  onPressed: _showServerPicker,
+                ),
+                Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                  child: TextButton.icon(
+                    style: TextButton.styleFrom(
+                      foregroundColor: _activeRoomId != null
+                          ? AppColors.accent
+                          : Colors.white,
+                      backgroundColor: Colors.white10,
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 12, vertical: 6),
+                    ),
+                    icon: const Icon(Icons.groups_rounded, size: 18),
+                    label: Text(
+                      _activeRoomId != null ? 'Room Nobar' : 'Nobar',
+                      style: const TextStyle(fontSize: 12),
+                    ),
+                    onPressed: _openWatchParty,
+                  ),
+                ),
               ],
             ),
-          ],
-        ),
-        actions: [
-          if (_currentFilm.isTv && _currentFilm.parsedTvId != null)
-            IconButton(
-              tooltip: 'Pilih Episode',
-              icon: const Icon(Icons.video_library_rounded,
-                  size: 20, color: Colors.white),
-              onPressed: _showEpisodePicker,
-            ),
-          IconButton(
-            tooltip: 'Ganti Server Pemutar',
-            icon: const Icon(Icons.dns_rounded, size: 20, color: Colors.white),
-            onPressed: _showServerPicker,
-          ),
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-            child: TextButton.icon(
-              style: TextButton.styleFrom(
-                foregroundColor:
-                    _activeRoomId != null ? AppColors.accent : Colors.white,
-                backgroundColor: Colors.white10,
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              ),
-              icon: const Icon(Icons.groups_rounded, size: 18),
-              label: Text(
-                _activeRoomId != null ? 'Room Nobar' : 'Nobar',
-                style: const TextStyle(fontSize: 12),
-              ),
-              onPressed: _openWatchParty,
-            ),
-          ),
-        ],
-      ),
       body: embedUrl == null
           ? const Center(
               child: Text(
@@ -532,14 +604,42 @@ class _EmbedPlayerScreenState extends State<EmbedPlayerScreen> {
                 style: TextStyle(color: Colors.white70),
               ),
             )
-          : KeyedSubtree(
-              key: ValueKey('embed-${_server.name}-${_currentFilm.id}'),
-              child: buildPlatformEmbedView(
-                url: embedUrl,
-                filmId: _currentFilm.id,
-                controller: _controller,
-                onOpenExternal: () => openLink(context, embedUrl),
-              ),
+          : Stack(
+              children: [
+                Positioned.fill(
+                  child: KeyedSubtree(
+                    key: ValueKey('embed-${_server.name}-${_currentFilm.id}'),
+                    child: buildPlatformEmbedView(
+                      url: embedUrl,
+                      filmId: _currentFilm.id,
+                      controller: _controller,
+                      onOpenExternal: () => openLink(context, embedUrl),
+                    ),
+                  ),
+                ),
+                if (_isFullscreen)
+                  Positioned(
+                    top: 14,
+                    left: 14,
+                    child: SafeArea(
+                      child: Container(
+                        decoration: const BoxDecoration(
+                          color: Color(0xA6000000),
+                          shape: BoxShape.circle,
+                        ),
+                        child: IconButton(
+                          tooltip: 'Keluar Layar Penuh',
+                          icon: const Icon(
+                            Icons.fullscreen_exit_rounded,
+                            color: Colors.white,
+                            size: 26,
+                          ),
+                          onPressed: _toggleFullscreen,
+                        ),
+                      ),
+                    ),
+                  ),
+              ],
             ),
     );
   }
