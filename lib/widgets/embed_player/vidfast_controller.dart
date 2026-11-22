@@ -6,6 +6,7 @@ import 'package:flutter/foundation.dart';
 class VidFastController extends ChangeNotifier {
   VidFastController({
     this.initialPositionSeconds = 0,
+    this.currentTmdbId,
     this.onProgressUpdate,
     this.onPartyAction,
     this.onEnded,
@@ -13,6 +14,7 @@ class VidFastController extends ChangeNotifier {
   });
 
   final int initialPositionSeconds;
+  int? currentTmdbId;
   final void Function(double currentTime, double duration)? onProgressUpdate;
   final void Function(String action, double time)? onPartyAction;
   final VoidCallback? onEnded;
@@ -154,6 +156,10 @@ class VidFastController extends ChangeNotifier {
       final value = entry.value;
       if (value is Map<String, dynamic>) {
         final id = value['id'] as int?;
+        // Hanya proses jika ID cocok dengan film/serial yang sedang dibuka
+        if (currentTmdbId != null && id != null && id != currentTmdbId) {
+          continue;
+        }
         final progress = value['progress'];
         if (id != null && progress is Map) {
           final watched = (progress['watched'] as num?)?.toDouble() ?? 0.0;

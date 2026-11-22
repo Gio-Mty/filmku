@@ -51,10 +51,11 @@ class _EmbedPlayerScreenState extends State<EmbedPlayerScreen> {
 
     _controller = VidFastController(
       initialPositionSeconds: savedPos,
+      currentTmdbId: _currentFilm.tmdbId ?? _currentFilm.parsedTvId,
       onProgressUpdate: (currentTime, duration) {
         if (duration > 0) {
           Library.instance.saveProgress(
-            widget.film.id,
+            _currentFilm.id,
             Duration(seconds: currentTime.toInt()),
             Duration(seconds: duration.toInt()),
           );
@@ -65,7 +66,7 @@ class _EmbedPlayerScreenState extends State<EmbedPlayerScreen> {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                widget.film.isTv
+                _currentFilm.isTv
                     ? 'Episode selesai ditonton!'
                     : 'Film selesai ditonton!',
               ),
@@ -76,11 +77,14 @@ class _EmbedPlayerScreenState extends State<EmbedPlayerScreen> {
         }
       },
       onMediaData: (tmdbId, watched, duration) {
-        Library.instance.saveProgress(
-          widget.film.id,
-          Duration(seconds: watched.toInt()),
-          Duration(seconds: duration.toInt()),
-        );
+        final currentId = _currentFilm.tmdbId ?? _currentFilm.parsedTvId;
+        if (currentId == null || tmdbId == currentId) {
+          Library.instance.saveProgress(
+            _currentFilm.id,
+            Duration(seconds: watched.toInt()),
+            Duration(seconds: duration.toInt()),
+          );
+        }
       },
       onPartyAction: (action, time) {
         if (_activeRoomId != null && _isHost) {
@@ -96,7 +100,7 @@ class _EmbedPlayerScreenState extends State<EmbedPlayerScreen> {
     _partyPollTimer?.cancel();
     if (_controller.duration > 0) {
       Library.instance.saveProgress(
-        widget.film.id,
+        _currentFilm.id,
         Duration(seconds: _controller.currentTime.toInt()),
         Duration(seconds: _controller.duration.toInt()),
       );
@@ -388,14 +392,25 @@ class _EmbedPlayerScreenState extends State<EmbedPlayerScreen> {
                           onTap: () {
                             Navigator.pop(ctx);
                             if (!isCurrent) {
-                              setState(() {
-                                _currentFilm = _currentFilm.copyWith(
-                                  id: 'tmdb-tv-$tid-s$_selectedSeason-e${ep.episodeNumber}',
-                                  title:
-                                      '${widget.film.title} - S$_selectedSeason:E${ep.episodeNumber}',
-                                  seasonNumber: _selectedSeason,
-                                  episodeNumber: ep.episodeNumber,
+                              if (_controller.duration > 0) {
+                                Library.instance.saveProgress(
+                                  _currentFilm.id,
+                                  Duration(
+                                      seconds: _controller.currentTime.toInt()),
+                                  Duration(
+                                      seconds: _controller.duration.toInt()),
                                 );
+                              }
+                              final newFilm = _currentFilm.copyWith(
+                                id: 'tmdb-tv-$tid-s$_selectedSeason-e${ep.episodeNumber}',
+                                title:
+                                    '${widget.film.title} - S$_selectedSeason:E${ep.episodeNumber}',
+                                seasonNumber: _selectedSeason,
+                                episodeNumber: ep.episodeNumber,
+                              );
+                              Library.instance.remember(newFilm);
+                              setState(() {
+                                _currentFilm = newFilm;
                               });
                             }
                           },
