@@ -36,6 +36,20 @@ class _EmbedPlayerScreenState extends State<EmbedPlayerScreen>
   Future<List<TvEpisode>>? _episodesFuture;
   bool _isLandscape = false;
   bool _isFullscreen = false;
+  bool _showFullscreenControls = true;
+  Timer? _fullscreenControlsTimer;
+
+  void _startFullscreenControlsTimer() {
+    _fullscreenControlsTimer?.cancel();
+    if (!_showFullscreenControls) {
+      setState(() => _showFullscreenControls = true);
+    }
+    _fullscreenControlsTimer = Timer(const Duration(seconds: 4), () {
+      if (mounted && _showFullscreenControls) {
+        setState(() => _showFullscreenControls = false);
+      }
+    });
+  }
 
   @override
   void initState() {
@@ -112,6 +126,7 @@ class _EmbedPlayerScreenState extends State<EmbedPlayerScreen>
 
   @override
   void dispose() {
+    _fullscreenControlsTimer?.cancel();
     WidgetsBinding.instance.removeObserver(this);
     _partyPollTimer?.cancel();
     if (_controller.duration > 0) {
@@ -160,7 +175,9 @@ class _EmbedPlayerScreenState extends State<EmbedPlayerScreen>
           DeviceOrientation.landscapeRight,
         ]);
         SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+        _startFullscreenControlsTimer();
       } else {
+        _fullscreenControlsTimer?.cancel();
         _isLandscape = false;
         SystemChrome.setPreferredOrientations(DeviceOrientation.values);
         SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
@@ -732,129 +749,174 @@ class _EmbedPlayerScreenState extends State<EmbedPlayerScreen>
                     ),
                   ),
                   if (_isFullscreen) ...[
-                    // Pojok Kiri Atas: Keluar Layar Penuh & Judul
-                    Positioned(
-                      top: 12,
-                      left: 12,
-                      child: SafeArea(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: const Color(0xBB000000),
-                            borderRadius: BorderRadius.circular(24),
-                            border:
-                                Border.all(color: Colors.white24, width: 0.8),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              IconButton(
-                                tooltip: 'Keluar Layar Penuh',
-                                icon: const Icon(
-                                  Icons.fullscreen_exit_rounded,
-                                  color: Colors.white,
-                                  size: 22,
-                                ),
-                                onPressed: _toggleFullscreen,
+                    // Tombol Menu melayang kecil di pojok kanan atas saat kontrol tersembunyi
+                    if (!_showFullscreenControls)
+                      Positioned(
+                        top: 10,
+                        right: 10,
+                        child: SafeArea(
+                          child: InkWell(
+                            onTap: _startFullscreenControlsTimer,
+                            borderRadius: BorderRadius.circular(20),
+                            child: Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 10, vertical: 5),
+                              decoration: BoxDecoration(
+                                color: const Color(0x66000000),
+                                borderRadius: BorderRadius.circular(20),
+                                border: Border.all(
+                                    color: Colors.white24, width: 0.8),
                               ),
-                              ConstrainedBox(
-                                constraints:
-                                    const BoxConstraints(maxWidth: 160),
-                                child: Text(
-                                  _currentFilm.title,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: const TextStyle(
-                                    color: Colors.white,
-                                    fontSize: 12,
-                                    fontWeight: FontWeight.bold,
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: const [
+                                  Icon(Icons.tune_rounded,
+                                      color: Colors.white70, size: 14),
+                                  SizedBox(width: 4),
+                                  Text(
+                                    'Menu',
+                                    style: TextStyle(
+                                      color: Colors.white70,
+                                      fontSize: 11,
+                                      fontWeight: FontWeight.w600,
+                                    ),
                                   ),
-                                ),
+                                ],
                               ),
-                              const SizedBox(width: 6),
-                            ],
+                            ),
                           ),
                         ),
                       ),
-                    ),
-                    // Pojok Kanan Atas: Mini Dock (Zoom, Episode, Server, Subtitle, Rotasi)
-                    Positioned(
-                      top: 12,
-                      right: 12,
-                      child: SafeArea(
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: const Color(0xBB000000),
-                            borderRadius: BorderRadius.circular(24),
-                            border:
-                                Border.all(color: Colors.white24, width: 0.8),
-                          ),
-                          child: Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              ListenableBuilder(
-                                listenable: _controller,
-                                builder: (context, _) => IconButton(
-                                  tooltip: _controller.isZoomedToFill
-                                      ? 'Rasio Normal (16:9)'
-                                      : 'Isi Layar Penuh (Zoom)',
-                                  icon: Icon(
-                                    _controller.isZoomedToFill
-                                        ? Icons.fit_screen_rounded
-                                        : Icons.aspect_ratio_rounded,
-                                    color: _controller.isZoomedToFill
-                                        ? AppColors.accent
-                                        : Colors.white,
-                                    size: 20,
+
+                    // Kontrol overlay layar penuh (Otomatis memudar hilang setelah 4 detik agar video bersih)
+                    AnimatedOpacity(
+                      opacity: _showFullscreenControls ? 1.0 : 0.0,
+                      duration: const Duration(milliseconds: 250),
+                      child: IgnorePointer(
+                        ignoring: !_showFullscreenControls,
+                        child: Stack(
+                          children: [
+                            // Pojok Kiri Atas: Tombol Keluar Layar Penuh (Ramping & Bulat, tidak nutupi video)
+                            Positioned(
+                              top: 12,
+                              left: 12,
+                              child: SafeArea(
+                                child: Container(
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xCC000000),
+                                    shape: BoxShape.circle,
+                                    border: Border.all(
+                                        color: Colors.white24, width: 0.8),
                                   ),
-                                  onPressed: _controller.toggleZoomToFill,
-                                ),
-                              ),
-                              if (_currentFilm.isTv &&
-                                  _currentFilm.parsedTvId != null)
-                                IconButton(
-                                  tooltip: 'Pilih Episode',
-                                  icon: const Icon(
-                                    Icons.video_library_rounded,
-                                    color: Colors.white,
-                                    size: 20,
+                                  child: IconButton(
+                                    tooltip: 'Keluar Layar Penuh',
+                                    icon: const Icon(
+                                      Icons.fullscreen_exit_rounded,
+                                      color: Colors.white,
+                                      size: 22,
+                                    ),
+                                    onPressed: _toggleFullscreen,
                                   ),
-                                  onPressed: _showEpisodePicker,
                                 ),
-                              IconButton(
-                                tooltip: 'Ganti Server',
-                                icon: const Icon(
-                                  Icons.dns_rounded,
-                                  color: Colors.white,
-                                  size: 20,
-                                ),
-                                onPressed: _showServerPicker,
                               ),
-                              IconButton(
-                                tooltip: 'Bantuan Subtitle',
-                                icon: const Icon(
-                                  Icons.subtitles_rounded,
-                                  color: Colors.white,
-                                  size: 20,
+                            ),
+                            // Pojok Kanan Atas: Mini Dock (Zoom, Episode, Server, Subtitle, Rotasi)
+                            Positioned(
+                              top: 12,
+                              right: 12,
+                              child: SafeArea(
+                                child: Container(
+                                  padding: const EdgeInsets.symmetric(
+                                      horizontal: 4, vertical: 2),
+                                  decoration: BoxDecoration(
+                                    color: const Color(0xCC000000),
+                                    borderRadius: BorderRadius.circular(24),
+                                    border: Border.all(
+                                        color: Colors.white24, width: 0.8),
+                                  ),
+                                  child: Row(
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      ListenableBuilder(
+                                        listenable: _controller,
+                                        builder: (context, _) => IconButton(
+                                          tooltip: _controller.isZoomedToFill
+                                              ? 'Rasio Normal (16:9)'
+                                              : 'Isi Layar Penuh (Zoom)',
+                                          icon: Icon(
+                                            _controller.isZoomedToFill
+                                                ? Icons.fit_screen_rounded
+                                                : Icons.aspect_ratio_rounded,
+                                            color: _controller.isZoomedToFill
+                                                ? AppColors.accent
+                                                : Colors.white,
+                                            size: 20,
+                                          ),
+                                          onPressed: () {
+                                            _controller.toggleZoomToFill();
+                                            _startFullscreenControlsTimer();
+                                          },
+                                        ),
+                                      ),
+                                      if (_currentFilm.isTv &&
+                                          _currentFilm.parsedTvId != null)
+                                        IconButton(
+                                          tooltip: 'Pilih Episode',
+                                          icon: const Icon(
+                                            Icons.video_library_rounded,
+                                            color: Colors.white,
+                                            size: 20,
+                                          ),
+                                          onPressed: () {
+                                            _startFullscreenControlsTimer();
+                                            _showEpisodePicker();
+                                          },
+                                        ),
+                                      IconButton(
+                                        tooltip: 'Ganti Server',
+                                        icon: const Icon(
+                                          Icons.dns_rounded,
+                                          color: Colors.white,
+                                          size: 20,
+                                        ),
+                                        onPressed: () {
+                                          _startFullscreenControlsTimer();
+                                          _showServerPicker();
+                                        },
+                                      ),
+                                      IconButton(
+                                        tooltip: 'Bantuan Subtitle',
+                                        icon: const Icon(
+                                          Icons.subtitles_rounded,
+                                          color: Colors.white,
+                                          size: 20,
+                                        ),
+                                        onPressed: () {
+                                          _startFullscreenControlsTimer();
+                                          _showSubtitleHelp();
+                                        },
+                                      ),
+                                      IconButton(
+                                        tooltip: 'Rotasi Layar',
+                                        icon: Icon(
+                                          _isLandscape
+                                              ? Icons
+                                                  .screen_lock_landscape_rounded
+                                              : Icons.screen_rotation_rounded,
+                                          color: Colors.white,
+                                          size: 20,
+                                        ),
+                                        onPressed: () {
+                                          _toggleRotation();
+                                          _startFullscreenControlsTimer();
+                                        },
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                                onPressed: _showSubtitleHelp,
                               ),
-                              IconButton(
-                                tooltip: 'Rotasi Layar',
-                                icon: Icon(
-                                  _isLandscape
-                                      ? Icons.screen_lock_landscape_rounded
-                                      : Icons.screen_rotation_rounded,
-                                  color: Colors.white,
-                                  size: 20,
-                                ),
-                                onPressed: _toggleRotation,
-                              ),
-                            ],
-                          ),
+                            ),
+                          ],
                         ),
                       ),
                     ),

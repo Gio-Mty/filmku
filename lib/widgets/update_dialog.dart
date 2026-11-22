@@ -14,12 +14,12 @@ Future<void> checkAndShowUpdate(BuildContext context, {bool manual = false}) asy
   // Kode terbaru di Web selalu langsung aktif cukup dengan F5 / reload browser.
   if (kIsWeb) {
     if (manual && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Versi Web selalu terhubung langsung dengan server terbaru (cukup tekan F5).'),
-          backgroundColor: AppColors.surface,
-          duration: Duration(seconds: 2),
-        ),
+      _showCustomSnackBar(
+        context,
+        icon: Icons.info_outline_rounded,
+        iconColor: AppColors.accent,
+        text:
+            'Versi Web selalu terhubung langsung dengan server terbaru (cukup tekan F5).',
       );
     }
     return;
@@ -37,25 +37,68 @@ Future<void> checkAndShowUpdate(BuildContext context, {bool manual = false}) asy
         );
       }
     } else if (manual && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Aplikasi sudah versi terbaru (v$currentAppVersion)'),
-          backgroundColor: AppColors.surface,
-          duration: Duration(seconds: 2),
-        ),
+      _showCustomSnackBar(
+        context,
+        icon: Icons.check_circle_rounded,
+        iconColor: AppColors.accent,
+        text: 'Aplikasi sudah versi terbaru (v$currentAppVersion)',
       );
     }
   } catch (_) {
     if (manual && context.mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(
-          content: Text('Tidak dapat memeriksa pembaruan saat ini.'),
-          backgroundColor: AppColors.surface,
-          duration: Duration(seconds: 2),
-        ),
+      _showCustomSnackBar(
+        context,
+        icon: Icons.error_outline_rounded,
+        iconColor: Colors.orangeAccent,
+        text: 'Tidak dapat memeriksa pembaruan saat ini.',
       );
     }
   }
+}
+
+void _showCustomSnackBar(
+  BuildContext context, {
+  required IconData icon,
+  required Color iconColor,
+  required String text,
+}) {
+  ScaffoldMessenger.of(context).hideCurrentSnackBar();
+  ScaffoldMessenger.of(context).showSnackBar(
+    SnackBar(
+      behavior: SnackBarBehavior.floating,
+      margin: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+      elevation: 6,
+      backgroundColor: const Color(0xFF222228),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(12),
+        side: const BorderSide(color: Colors.white12, width: 0.8),
+      ),
+      content: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(6),
+            decoration: BoxDecoration(
+              color: iconColor.withValues(alpha: 0.15),
+              shape: BoxShape.circle,
+            ),
+            child: Icon(icon, color: iconColor, size: 18),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text,
+              style: const TextStyle(
+                color: Colors.white,
+                fontWeight: FontWeight.w600,
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ],
+      ),
+      duration: const Duration(seconds: 3),
+    ),
+  );
 }
 
 class AppUpdateDialog extends StatelessWidget {
@@ -124,94 +167,105 @@ class AppUpdateDialog extends StatelessWidget {
               ),
             ),
             const SizedBox(height: 8),
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.black26,
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: Colors.white10),
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  for (final item in info.changelog)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 3),
-                      child: Row(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: [
-                          const Icon(
-                            Icons.check_circle_rounded,
-                            size: 15,
-                            color: AppColors.accent,
-                          ),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              item,
-                              style: const TextStyle(
-                                fontSize: 12,
-                                color: Colors.white,
-                                height: 1.3,
+            ConstrainedBox(
+              constraints: const BoxConstraints(maxHeight: 200),
+              child: Container(
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.black26,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: Colors.white10),
+                ),
+                child: SingleChildScrollView(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      for (final item in info.changelog)
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 4),
+                          child: Row(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              const Padding(
+                                padding: EdgeInsets.only(top: 2),
+                                child: Icon(
+                                  Icons.check_circle_rounded,
+                                  size: 14,
+                                  color: AppColors.accent,
+                                ),
                               ),
-                            ),
+                              const SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  item,
+                                  style: const TextStyle(
+                                    fontSize: 12,
+                                    color: Colors.white,
+                                    height: 1.35,
+                                  ),
+                                ),
+                              ),
+                            ],
                           ),
-                        ],
-                      ),
-                    ),
-                ],
+                        ),
+                    ],
+                  ),
+                ),
               ),
             ),
-            const SizedBox(height: 20),
-            Row(
+            const SizedBox(height: 18),
+            Column(
+              mainAxisSize: MainAxisSize.min,
               children: [
-                if (!info.forceUpdate)
-                  Expanded(
-                    child: OutlinedButton(
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.white70,
-                        side: const BorderSide(color: Colors.white24),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(8),
-                        ),
-                        minimumSize: const Size.fromHeight(44),
-                      ),
-                      onPressed: () => Navigator.pop(context),
-                      child: const Text('Nanti Saja'),
-                    ),
-                  ),
-                if (!info.forceUpdate) const SizedBox(width: 10),
-                Expanded(
-                  flex: info.forceUpdate ? 1 : 2,
+                SizedBox(
+                  width: double.infinity,
+                  height: 46,
                   child: FilledButton.icon(
                     style: FilledButton.styleFrom(
                       backgroundColor: AppColors.accent,
                       foregroundColor: AppColors.onAccent,
                       shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(8),
+                        borderRadius: BorderRadius.circular(10),
                       ),
-                      minimumSize: const Size.fromHeight(44),
                     ),
                     icon: const Icon(Icons.download_rounded, size: 20),
                     label: const Text(
                       'Update Sekarang',
-                      style: TextStyle(fontWeight: FontWeight.bold),
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 14,
+                      ),
                     ),
                     onPressed: () {
                       openLink(context, info.downloadUrl);
                       if (!info.forceUpdate) Navigator.pop(context);
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content: Text(
+                      _showCustomSnackBar(
+                        context,
+                        icon: Icons.downloading_rounded,
+                        iconColor: AppColors.accent,
+                        text:
                             'Mengunduh file APK baru... Periksa notifikasi download di HP Anda.',
-                          ),
-                          backgroundColor: AppColors.accent,
-                          duration: Duration(seconds: 4),
-                        ),
                       );
                     },
                   ),
                 ),
+                if (!info.forceUpdate) ...[
+                  const SizedBox(height: 6),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 38,
+                    child: TextButton(
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.white60,
+                      ),
+                      onPressed: () => Navigator.pop(context),
+                      child: const Text(
+                        'Nanti Saja',
+                        style: TextStyle(fontSize: 13),
+                      ),
+                    ),
+                  ),
+                ],
               ],
             ),
           ],
