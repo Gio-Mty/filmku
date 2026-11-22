@@ -74,9 +74,25 @@ class _MobileWebViewState extends State<_MobileWebView> {
             }
 
             final host = uri.host.toLowerCase();
+
+            // Blokir langsung domain iklan, judi, slot, tracking
+            const adKeywords = [
+              'bet', 'slot', 'judi', 'casino', 'poker', 'gacor',
+              'popads', 'adsterra', 'adkeeper', 'propeller', 'exoclick',
+              'trafficjunky', 'onclick', 'doubleclick', 'syndication',
+              'shopee', 'lazada', 'tokopedia', 'redirect', 'track',
+              'outbrain', 'taboola', 'mgid', 'adnxs', 'criteo',
+              'advert', 'banner', 'monetag', 'hilltopads', 'click',
+            ];
+            if (adKeywords.any((k) => host.contains(k))) {
+              return NavigationDecision.prevent;
+            }
+
+            // Hanya izinkan domain pemutar video dan CDN resmi
             const allowedKeywords = [
               'vidfast',
               'vidsrc',
+              'vidlink',
               'multiembed',
               'autoembed',
               '2embed',
@@ -84,8 +100,20 @@ class _MobileWebViewState extends State<_MobileWebView> {
               'cloudstream',
               'rabbitstream',
               'megacloud',
-              'stream',
-              'player',
+              'dokicloud',
+              'upstream',
+              'streamtape',
+              'mixdrop',
+              'filelions',
+              'streamwish',
+              'jwplayer',
+              'cloudflare',
+              'google',
+              'gstatic',
+              'googleapis',
+              'tmdb.org',
+              'themoviedb.org',
+              'wsrv.nl',
             ];
 
             if (allowedKeywords.any((k) => host.contains(k))) {
@@ -97,13 +125,68 @@ class _MobileWebViewState extends State<_MobileWebView> {
           },
           onPageStarted: (_) {
             if (mounted) setState(() => _loading = true);
+            _controller.runJavaScript("""
+              try { window.open = function() { return null; }; } catch(e) {}
+            """);
           },
           onPageFinished: (_) {
             if (mounted) setState(() => _loading = false);
             _controller.runJavaScript("""
               (function() {
-                // Blokir popup liar dari iklan pihak ketiga
-                window.open = function() { return null; };
+                try {
+                  window.open = function() { return null; };
+                  window.alert = function() {};
+                  window.confirm = function() { return false; };
+                  window.prompt = function() { return null; };
+                } catch(e) {}
+
+                // Cegah clickjacking iklan pada link eksternal
+                document.addEventListener('click', function(e) {
+                  var target = e.target;
+                  while (target && target.tagName !== 'A') {
+                    target = target.parentElement;
+                  }
+                  if (target && target.tagName === 'A') {
+                    var href = (target.getAttribute('href') || '').toLowerCase();
+                    var host = (target.host || '').toLowerCase();
+                    var isTrusted = host.includes('vidfast') || host.includes('vidsrc') ||
+                                    host.includes('vidlink') || host.includes('multiembed') ||
+                                    host.includes('2embed') || host.includes('rabbitstream') ||
+                                    host.includes('megacloud');
+                    if (target.target === '_blank' || !isTrusted || href.includes('bet') || href.includes('slot') || href.includes('judi')) {
+                      e.preventDefault();
+                      e.stopPropagation();
+                      return false;
+                    }
+                  }
+                }, true);
+
+                // Bersihkan elemen overlay iklan transparan dan popup liar
+                function cleanAdOverlays() {
+                  var selectors = [
+                    'div[style*="z-index: 2147483647"]',
+                    'div[id*="ad"]', 'div[class*="ad"]',
+                    'iframe[src*="ad"]', 'iframe[id*="ad"]',
+                    'a[href*="bet"]', 'a[href*="slot"]', 'a[href*="casino"]',
+                    'div[style*="position: fixed"][style*="z-index: 9999"]',
+                    'div[style*="position: fixed"][style*="z-index: 99999"]'
+                  ];
+                  for (var s = 0; s < selectors.length; s++) {
+                    try {
+                      var elements = document.querySelectorAll(selectors[s]);
+                      for (var i = 0; i < elements.length; i++) {
+                        var el = elements[i];
+                        if (!el.id.includes('player') && !el.className.includes('player') && !el.querySelector('video')) {
+                          el.remove();
+                        }
+                      }
+                    } catch(_) {}
+                  }
+                }
+
+                cleanAdOverlays();
+                setInterval(cleanAdOverlays, 800);
+
                 if (window.__vidfast_bridge_injected) return;
                 window.__vidfast_bridge_injected = true;
                 window.addEventListener('message', function(event) {

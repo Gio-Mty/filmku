@@ -1,8 +1,9 @@
 enum VideoServer {
   vidfast('VidFast (HD)', 'Server Utama Cepat (Subtitle ID)'),
-  vidsrc('VidSrc', 'Server Alternatif 1'),
-  superembed('MultiEmbed', 'Server Alternatif 2'),
-  autoembed('AutoEmbed', 'Server Alternatif 3');
+  vidlink('VidLink (No Ads)', 'Server Alternatif 1 (Sangat Bersih & Cepat)'),
+  vidsrc('VidSrc (Baru)', 'Server Alternatif 2 (vidsrc.xyz Aktif)'),
+  twoembed('2Embed', 'Server Alternatif 3 (Cadangan)'),
+  superembed('MultiEmbed', 'Server Alternatif 4 (Cadangan)');
 
   final String label;
   final String description;
@@ -86,12 +87,14 @@ class Film {
       switch (server) {
         case VideoServer.vidfast:
           return 'https://vidfast.vc/tv/$tid/$s/$ep?nextButton=true&autoNext=true&theme=00D97E&sub=id';
+        case VideoServer.vidlink:
+          return 'https://vidlink.pro/tv/$tid/$s/$ep?primaryColor=00D97E';
         case VideoServer.vidsrc:
-          return 'https://vidsrc.cc/v2/embed/tv/$tid/$s/$ep';
+          return 'https://vidsrc.xyz/embed/tv/$tid/$s/$ep';
+        case VideoServer.twoembed:
+          return 'https://www.2embed.cc/embedtv/$tid&s=$s&e=$ep';
         case VideoServer.superembed:
           return 'https://multiembed.mov/?video_id=$tid&tmdb=1&s=$s&e=$ep';
-        case VideoServer.autoembed:
-          return 'https://player.autoembed.cc/embed/tv/$tid/$s/$ep';
       }
     }
     final mid = tmdbId;
@@ -99,12 +102,14 @@ class Film {
       switch (server) {
         case VideoServer.vidfast:
           return 'https://vidfast.vc/movie/$mid?theme=00D97E';
+        case VideoServer.vidlink:
+          return 'https://vidlink.pro/movie/$mid?primaryColor=00D97E';
         case VideoServer.vidsrc:
-          return 'https://vidsrc.cc/v2/embed/movie/$mid';
+          return 'https://vidsrc.xyz/embed/movie/$mid';
+        case VideoServer.twoembed:
+          return 'https://www.2embed.cc/embed/$mid';
         case VideoServer.superembed:
           return 'https://multiembed.mov/?video_id=$mid&tmdb=1';
-        case VideoServer.autoembed:
-          return 'https://player.autoembed.cc/embed/movie/$mid';
       }
     }
     return null;
