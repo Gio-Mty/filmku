@@ -1,7 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:webview_flutter/webview_flutter.dart';
+import 'package:webview_flutter_android/webview_flutter_android.dart';
 
 import '../../theme.dart';
 import 'vidfast_controller.dart';
@@ -211,6 +213,70 @@ class _MobileWebViewState extends State<_MobileWebView> {
       )
       ..loadRequest(Uri.parse(widget.url));
 
+    final platform = _controller.platform;
+    if (platform is AndroidWebViewController) {
+      platform.setCustomWidgetCallbacks(
+        onShowCustomWidget: (Widget customWidget, OnHideCustomWidgetCallback onHideCustomWidget) {
+          SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+          SystemChrome.setPreferredOrientations([
+            DeviceOrientation.landscapeLeft,
+            DeviceOrientation.landscapeRight,
+          ]);
+          Navigator.of(context).push(
+            MaterialPageRoute<void>(
+              builder: (BuildContext routeCtx) => PopScope(
+                canPop: true,
+                onPopInvokedWithResult: (didPop, _) {
+                  if (didPop) {
+                    onHideCustomWidget();
+                    SystemChrome.setPreferredOrientations(DeviceOrientation.values);
+                    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+                  }
+                },
+                child: Scaffold(
+                  backgroundColor: Colors.black,
+                  body: Stack(
+                    children: [
+                      Center(child: customWidget),
+                      Positioned(
+                        top: 14,
+                        left: 14,
+                        child: SafeArea(
+                          child: Container(
+                            decoration: const BoxDecoration(
+                              color: Color(0xA6000000),
+                              shape: BoxShape.circle,
+                            ),
+                            child: IconButton(
+                              tooltip: 'Keluar Layar Penuh',
+                              icon: const Icon(
+                                Icons.fullscreen_exit_rounded,
+                                color: Colors.white,
+                                size: 26,
+                              ),
+                              onPressed: () => Navigator.of(routeCtx).pop(),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              fullscreenDialog: true,
+            ),
+          );
+        },
+        onHideCustomWidget: () {
+          SystemChrome.setPreferredOrientations(DeviceOrientation.values);
+          SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+          if (mounted && Navigator.of(context).canPop()) {
+            Navigator.of(context).pop();
+          }
+        },
+      );
+    }
+
     widget.controller.commandDispatcher = (command, params) {
       final jsonParams = jsonEncode({'command': command, ...params});
       _controller.runJavaScript("""
@@ -230,30 +296,43 @@ class _MobileWebViewState extends State<_MobileWebView> {
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: [
-        WebViewWidget(controller: _controller),
-        if (_loading)
-          const ColoredBox(
-            color: Colors.black,
-            child: Center(
-              child: CircularProgressIndicator(color: AppColors.accent),
-            ),
-          ),
-        if (_error != null)
-          ColoredBox(
-            color: Colors.black,
-            child: Center(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Text(
-                  'Gagal memuat pemutar: $_error',
-                  style: const TextStyle(color: Colors.white70),
+    return ListenableBuilder(
+      listenable: widget.controller,
+      builder: (context, _) {
+        final scale = widget.controller.isZoomedToFill ? 1.25 : 1.0;
+        return ClipRect(
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: Transform.scale(
+                  scale: scale,
+                  child: WebViewWidget(controller: _controller),
                 ),
               ),
-            ),
+              if (_loading)
+                const ColoredBox(
+                  color: Colors.black,
+                  child: Center(
+                    child: CircularProgressIndicator(color: AppColors.accent),
+                  ),
+                ),
+              if (_error != null)
+                ColoredBox(
+                  color: Colors.black,
+                  child: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(24),
+                      child: Text(
+                        'Gagal memuat pemutar: $_error',
+                        style: const TextStyle(color: Colors.white70),
+                      ),
+                    ),
+                  ),
+                ),
+            ],
           ),
-      ],
+        );
+      },
     );
   }
 }

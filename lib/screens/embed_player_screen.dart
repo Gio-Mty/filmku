@@ -22,7 +22,8 @@ class EmbedPlayerScreen extends StatefulWidget {
   State<EmbedPlayerScreen> createState() => _EmbedPlayerScreenState();
 }
 
-class _EmbedPlayerScreenState extends State<EmbedPlayerScreen> {
+class _EmbedPlayerScreenState extends State<EmbedPlayerScreen>
+    with WidgetsBindingObserver {
   late final VidFastController _controller;
   String? _activeRoomId;
   bool _isHost = false;
@@ -39,6 +40,7 @@ class _EmbedPlayerScreenState extends State<EmbedPlayerScreen> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     // Otomatis sembunyikan status bar & navigasi sistem (Immersive Sticky Fullscreen)
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
 
@@ -102,7 +104,15 @@ class _EmbedPlayerScreenState extends State<EmbedPlayerScreen> {
   }
 
   @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    if (state == AppLifecycleState.resumed) {
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+    }
+  }
+
+  @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _partyPollTimer?.cancel();
     if (_controller.duration > 0) {
       Library.instance.saveProgress(
@@ -136,6 +146,7 @@ class _EmbedPlayerScreenState extends State<EmbedPlayerScreen> {
           DeviceOrientation.portraitDown,
         ]);
       }
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     });
   }
 
@@ -210,6 +221,78 @@ class _EmbedPlayerScreenState extends State<EmbedPlayerScreen> {
         }
       } catch (_) {}
     });
+  }
+
+  void _showSubtitleHelp() {
+    showModalBottomSheet<void>(
+      context: context,
+      backgroundColor: AppColors.surface,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: const [
+                    Icon(Icons.subtitles_rounded,
+                        color: AppColors.accent, size: 24),
+                    SizedBox(width: 10),
+                    Text(
+                      'Bantuan Sinkronisasi Subtitle',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 14),
+                const Text(
+                  'Jika subtitle Indonesia terlambat atau terlalu cepat:\n\n'
+                  '1. Gunakan Server VidLink (Paling Pas & Tanpa Iklan):\n'
+                  '   Pilih server "VidLink (No Ads)". VidLink memiliki subtitle multi-bahasa yang otomatis sinkron dengan audio video.\n\n'
+                  '2. Atur Delay di Player VidFast:\n'
+                  '   Di dalam player VidFast, klik layar video > klik ikon Gear (⚙️) atau ikon CC di kanan bawah > pilih "Subtitle Offset / Delay". Anda bisa memajukan/memundurkan delay subtitle (+0.5s / -0.5s).\n\n'
+                  '3. Ganti ke Server Alternatif Lain:\n'
+                  '   Jika subtitle masih kurang pas, coba beralih ke "VidSrc (Baru)" atau "2Embed".',
+                  style: TextStyle(
+                      color: Colors.white70, fontSize: 13, height: 1.5),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton.icon(
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: AppColors.accent,
+                      foregroundColor: Colors.black,
+                      padding: const EdgeInsets.symmetric(vertical: 12),
+                    ),
+                    icon: const Icon(Icons.dns_rounded),
+                    label: const Text(
+                      'Ganti ke Server VidLink (No Ads)',
+                      style: TextStyle(fontWeight: FontWeight.bold),
+                    ),
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      if (_server != VideoServer.vidlink) {
+                        setState(() => _server = VideoServer.vidlink);
+                      }
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   void _showServerPicker() {
@@ -479,168 +562,306 @@ class _EmbedPlayerScreenState extends State<EmbedPlayerScreen> {
   Widget build(BuildContext context) {
     final embedUrl = _currentFilm.embedUrlForServer(_server);
 
-    return Scaffold(
-      backgroundColor: Colors.black,
-      appBar: _isFullscreen
-          ? null
-          : AppBar(
-              backgroundColor: const Color(0xFF141416),
-              elevation: 0,
-              leading: IconButton(
-                tooltip: 'Kembali',
-                icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
-                onPressed: () => Navigator.pop(context),
-              ),
-              title: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    _currentFilm.title,
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(
-                      fontSize: 15,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                  Row(
-                    children: [
-                      if (_currentFilm.isTv &&
-                          _currentFilm.episodeNumber != null)
-                        Text(
-                          'S$_selectedSeason:E${_currentFilm.episodeNumber} • ',
-                          style: const TextStyle(
-                              fontSize: 11,
-                              color: AppColors.accent,
-                              fontWeight: FontWeight.bold),
-                        ),
-                      Text(
-                        _server.label,
-                        style: const TextStyle(
-                            fontSize: 11, color: AppColors.muted),
+    return AnnotatedRegion<SystemUiOverlayStyle>(
+      value: const SystemUiOverlayStyle(
+        statusBarColor: Colors.transparent,
+        statusBarIconBrightness: Brightness.light,
+        systemNavigationBarColor: Colors.transparent,
+        systemNavigationBarIconBrightness: Brightness.light,
+      ),
+      child: Scaffold(
+        backgroundColor: Colors.black,
+        appBar: _isFullscreen
+            ? null
+            : AppBar(
+                backgroundColor: const Color(0xFF141416),
+                elevation: 0,
+                leading: IconButton(
+                  tooltip: 'Kembali',
+                  icon: const Icon(Icons.arrow_back_rounded, color: Colors.white),
+                  onPressed: () => Navigator.pop(context),
+                ),
+                title: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      _currentFilm.title,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
                       ),
-                      if (_activeRoomId != null) ...[
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: AppColors.accent,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            'NOBAR: $_activeRoomId',
+                    ),
+                    Row(
+                      children: [
+                        if (_currentFilm.isTv &&
+                            _currentFilm.episodeNumber != null)
+                          Text(
+                            'S$_selectedSeason:E${_currentFilm.episodeNumber} • ',
                             style: const TextStyle(
-                              color: Colors.black,
-                              fontWeight: FontWeight.bold,
-                              fontSize: 10,
+                                fontSize: 11,
+                                color: AppColors.accent,
+                                fontWeight: FontWeight.bold),
+                          ),
+                        Text(
+                          _server.label,
+                          style: const TextStyle(
+                              fontSize: 11, color: AppColors.muted),
+                        ),
+                        if (_activeRoomId != null) ...[
+                          const SizedBox(width: 8),
+                          Container(
+                            padding: const EdgeInsets.symmetric(
+                                horizontal: 6, vertical: 2),
+                            decoration: BoxDecoration(
+                              color: AppColors.accent,
+                              borderRadius: BorderRadius.circular(4),
+                            ),
+                            child: Text(
+                              'NOBAR: $_activeRoomId',
+                              style: const TextStyle(
+                                color: Colors.black,
+                                fontWeight: FontWeight.bold,
+                                fontSize: 10,
+                              ),
                             ),
                           ),
-                        ),
+                        ],
                       ],
-                    ],
+                    ),
+                  ],
+                ),
+                actions: [
+                  if (_currentFilm.isTv && _currentFilm.parsedTvId != null)
+                    IconButton(
+                      tooltip: 'Pilih Episode',
+                      icon: const Icon(Icons.video_library_rounded,
+                          size: 20, color: Colors.white),
+                      onPressed: _showEpisodePicker,
+                    ),
+                  ListenableBuilder(
+                    listenable: _controller,
+                    builder: (context, _) => IconButton(
+                      tooltip: _controller.isZoomedToFill
+                          ? 'Rasio Normal (16:9)'
+                          : 'Isi Layar Penuh (Zoom)',
+                      icon: Icon(
+                        _controller.isZoomedToFill
+                            ? Icons.fit_screen_rounded
+                            : Icons.aspect_ratio_rounded,
+                        size: 20,
+                        color: _controller.isZoomedToFill
+                            ? AppColors.accent
+                            : Colors.white,
+                      ),
+                      onPressed: _controller.toggleZoomToFill,
+                    ),
+                  ),
+                  IconButton(
+                    tooltip: 'Bantuan Subtitle',
+                    icon: const Icon(Icons.subtitles_rounded,
+                        size: 20, color: Colors.white),
+                    onPressed: _showSubtitleHelp,
+                  ),
+                  IconButton(
+                    tooltip: 'Rotasi Layar',
+                    icon: Icon(
+                      _isLandscape
+                          ? Icons.screen_lock_landscape_rounded
+                          : Icons.screen_rotation_rounded,
+                      size: 20,
+                      color: Colors.white,
+                    ),
+                    onPressed: _toggleRotation,
+                  ),
+                  IconButton(
+                    tooltip: 'Layar Penuh (100% Fullscreen)',
+                    icon: const Icon(Icons.fullscreen_rounded,
+                        size: 24, color: Colors.white),
+                    onPressed: _toggleFullscreen,
+                  ),
+                  IconButton(
+                    tooltip: 'Ganti Server Pemutar',
+                    icon: const Icon(Icons.dns_rounded,
+                        size: 20, color: Colors.white),
+                    onPressed: _showServerPicker,
+                  ),
+                  Padding(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+                    child: TextButton.icon(
+                      style: TextButton.styleFrom(
+                        foregroundColor: _activeRoomId != null
+                            ? AppColors.accent
+                            : Colors.white,
+                        backgroundColor: Colors.white10,
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 6),
+                      ),
+                      icon: const Icon(Icons.groups_rounded, size: 18),
+                      label: Text(
+                        _activeRoomId != null ? 'Room Nobar' : 'Nobar',
+                        style: const TextStyle(fontSize: 12),
+                      ),
+                      onPressed: _openWatchParty,
+                    ),
                   ),
                 ],
               ),
-              actions: [
-                if (_currentFilm.isTv && _currentFilm.parsedTvId != null)
-                  IconButton(
-                    tooltip: 'Pilih Episode',
-                    icon: const Icon(Icons.video_library_rounded,
-                        size: 20, color: Colors.white),
-                    onPressed: _showEpisodePicker,
-                  ),
-                IconButton(
-                  tooltip: 'Rotasi Layar',
-                  icon: Icon(
-                    _isLandscape
-                        ? Icons.screen_lock_landscape_rounded
-                        : Icons.screen_rotation_rounded,
-                    size: 20,
-                    color: Colors.white,
-                  ),
-                  onPressed: _toggleRotation,
+        body: embedUrl == null
+            ? const Center(
+                child: Text(
+                  'Tautan video tidak tersedia.',
+                  style: TextStyle(color: Colors.white70),
                 ),
-                IconButton(
-                  tooltip: 'Layar Penuh (100% Fullscreen)',
-                  icon: const Icon(Icons.fullscreen_rounded,
-                      size: 24, color: Colors.white),
-                  onPressed: _toggleFullscreen,
-                ),
-                IconButton(
-                  tooltip: 'Ganti Server Pemutar',
-                  icon: const Icon(Icons.dns_rounded,
-                      size: 20, color: Colors.white),
-                  onPressed: _showServerPicker,
-                ),
-                Padding(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 8),
-                  child: TextButton.icon(
-                    style: TextButton.styleFrom(
-                      foregroundColor: _activeRoomId != null
-                          ? AppColors.accent
-                          : Colors.white,
-                      backgroundColor: Colors.white10,
-                      padding: const EdgeInsets.symmetric(
-                          horizontal: 12, vertical: 6),
-                    ),
-                    icon: const Icon(Icons.groups_rounded, size: 18),
-                    label: Text(
-                      _activeRoomId != null ? 'Room Nobar' : 'Nobar',
-                      style: const TextStyle(fontSize: 12),
-                    ),
-                    onPressed: _openWatchParty,
-                  ),
-                ),
-              ],
-            ),
-      body: embedUrl == null
-          ? const Center(
-              child: Text(
-                'Tautan video tidak tersedia.',
-                style: TextStyle(color: Colors.white70),
-              ),
-            )
-          : Stack(
-              children: [
-                Positioned.fill(
-                  child: KeyedSubtree(
-                    key: ValueKey('embed-${_server.name}-${_currentFilm.id}'),
-                    child: buildPlatformEmbedView(
-                      url: embedUrl,
-                      filmId: _currentFilm.id,
-                      controller: _controller,
-                      onOpenExternal: () => openLink(context, embedUrl),
-                    ),
-                  ),
-                ),
-                if (_isFullscreen)
-                  Positioned(
-                    top: 14,
-                    left: 14,
-                    child: SafeArea(
-                      child: Container(
-                        decoration: const BoxDecoration(
-                          color: Color(0xA6000000),
-                          shape: BoxShape.circle,
-                        ),
-                        child: IconButton(
-                          tooltip: 'Keluar Layar Penuh',
-                          icon: const Icon(
-                            Icons.fullscreen_exit_rounded,
-                            color: Colors.white,
-                            size: 26,
-                          ),
-                          onPressed: _toggleFullscreen,
-                        ),
+              )
+            : Stack(
+                children: [
+                  Positioned.fill(
+                    child: KeyedSubtree(
+                      key: ValueKey('embed-${_server.name}-${_currentFilm.id}'),
+                      child: buildPlatformEmbedView(
+                        url: embedUrl,
+                        filmId: _currentFilm.id,
+                        controller: _controller,
+                        onOpenExternal: () => openLink(context, embedUrl),
                       ),
                     ),
                   ),
-              ],
-            ),
+                  if (_isFullscreen) ...[
+                    // Pojok Kiri Atas: Keluar Layar Penuh & Judul
+                    Positioned(
+                      top: 12,
+                      left: 12,
+                      child: SafeArea(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xBB000000),
+                            borderRadius: BorderRadius.circular(24),
+                            border:
+                                Border.all(color: Colors.white24, width: 0.8),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              IconButton(
+                                tooltip: 'Keluar Layar Penuh',
+                                icon: const Icon(
+                                  Icons.fullscreen_exit_rounded,
+                                  color: Colors.white,
+                                  size: 22,
+                                ),
+                                onPressed: _toggleFullscreen,
+                              ),
+                              ConstrainedBox(
+                                constraints:
+                                    const BoxConstraints(maxWidth: 160),
+                                child: Text(
+                                  _currentFilm.title,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: const TextStyle(
+                                    color: Colors.white,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 6),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                    // Pojok Kanan Atas: Mini Dock (Zoom, Episode, Server, Subtitle, Rotasi)
+                    Positioned(
+                      top: 12,
+                      right: 12,
+                      child: SafeArea(
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 6, vertical: 2),
+                          decoration: BoxDecoration(
+                            color: const Color(0xBB000000),
+                            borderRadius: BorderRadius.circular(24),
+                            border:
+                                Border.all(color: Colors.white24, width: 0.8),
+                          ),
+                          child: Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              ListenableBuilder(
+                                listenable: _controller,
+                                builder: (context, _) => IconButton(
+                                  tooltip: _controller.isZoomedToFill
+                                      ? 'Rasio Normal (16:9)'
+                                      : 'Isi Layar Penuh (Zoom)',
+                                  icon: Icon(
+                                    _controller.isZoomedToFill
+                                        ? Icons.fit_screen_rounded
+                                        : Icons.aspect_ratio_rounded,
+                                    color: _controller.isZoomedToFill
+                                        ? AppColors.accent
+                                        : Colors.white,
+                                    size: 20,
+                                  ),
+                                  onPressed: _controller.toggleZoomToFill,
+                                ),
+                              ),
+                              if (_currentFilm.isTv &&
+                                  _currentFilm.parsedTvId != null)
+                                IconButton(
+                                  tooltip: 'Pilih Episode',
+                                  icon: const Icon(
+                                    Icons.video_library_rounded,
+                                    color: Colors.white,
+                                    size: 20,
+                                  ),
+                                  onPressed: _showEpisodePicker,
+                                ),
+                              IconButton(
+                                tooltip: 'Ganti Server',
+                                icon: const Icon(
+                                  Icons.dns_rounded,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
+                                onPressed: _showServerPicker,
+                              ),
+                              IconButton(
+                                tooltip: 'Bantuan Subtitle',
+                                icon: const Icon(
+                                  Icons.subtitles_rounded,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
+                                onPressed: _showSubtitleHelp,
+                              ),
+                              IconButton(
+                                tooltip: 'Rotasi Layar',
+                                icon: Icon(
+                                  _isLandscape
+                                      ? Icons.screen_lock_landscape_rounded
+                                      : Icons.screen_rotation_rounded,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
+                                onPressed: _toggleRotation,
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+      ),
     );
   }
 }

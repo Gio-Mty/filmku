@@ -27,6 +27,7 @@ class VidFastController extends ChangeNotifier {
   double _volume = 1.0;
   bool _isReady = false;
   bool _hasInitialSeeked = false;
+  bool _isZoomedToFill = false;
 
   /// Dispatcher yang disuntikkan oleh platform (Web iframe atau Mobile WebView).
   void Function(String command, Map<String, dynamic> params)? commandDispatcher;
@@ -37,6 +38,20 @@ class VidFastController extends ChangeNotifier {
   bool get isMuted => _isMuted;
   double get volume => _volume;
   bool get isReady => _isReady;
+  bool get isZoomedToFill => _isZoomedToFill;
+
+  /// Toggle mode zoom untuk mengisi 100% layar (menghilangkan bar hitam samping)
+  void toggleZoomToFill() {
+    _isZoomedToFill = !_isZoomedToFill;
+    notifyListeners();
+  }
+
+  void setZoomToFill(bool zoom) {
+    if (_isZoomedToFill != zoom) {
+      _isZoomedToFill = zoom;
+      notifyListeners();
+    }
+  }
 
   /// Kirim perintah 'play' ke VidFast
   void play({bool fromParty = false}) {
