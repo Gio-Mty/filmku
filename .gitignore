@@ -54,3 +54,5 @@ backend/.venv/
 *.env
 .env
 
+.vercel
+.env*

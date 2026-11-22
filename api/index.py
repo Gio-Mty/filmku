@@ -1204,6 +1204,17 @@ async def download_apk() -> FileResponse:
     raise HTTPException(404, "File APK belum ditemukan di server. Silakan bangun APK terlebih dahulu.")
 
 
+@app.get("/{full_path:path}")
+async def debug_unmatched(request: Request, full_path: str):
+    return {
+        "debug": "unmatched_route",
+        "full_path": full_path,
+        "request_url_path": request.url.path,
+        "scope_path": request.scope.get("path"),
+        "headers": dict(request.headers),
+    }
+
+
 try:
     from mangum import Mangum
     handler = Mangum(app)
